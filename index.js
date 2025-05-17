@@ -38,20 +38,38 @@ app.get('/api/keepalive', (req, res) => {
   }
 });
 
-// --- Endpoint da API Nandylock ---
+// --- Endpoint da API Nandylock (CORRIGIDO) ---
 app.get('/api/nandylock', async (req, res) => {
-  const { pergunta } = req.query;
+  // Extrair e sanitizar o parâmetro pergunta
+  let pergunta = req.query.pergunta || "";
   const now = new Date().toISOString();
 
+  // Sanitização da pergunta para remover prefixos indesejados
+  if (typeof pergunta === 'string') {
+    // Remover "pergunta=" se estiver presente no início da string
+    if (pergunta.startsWith("pergunta=")) {
+      pergunta = pergunta.substring(9); // Remove os primeiros 9 caracteres ("pergunta=")
+    }
+    
+    // Remover metadados JSON que possam estar no início da string
+    const jsonPrefixMatch = pergunta.match(/^\s*\{.*?\}\s*/);
+    if (jsonPrefixMatch) {
+      pergunta = pergunta.substring(jsonPrefixMatch[0].length);
+    }
+    
+    // Remover espaços extras no início e fim
+    pergunta = pergunta.trim();
+  }
+
   if (!pergunta) {
-    console.warn(`[${now}] API /api/nandylock: Pergunta não fornecida.`);
+    console.warn(`[${now}] API /api/nandylock: Pergunta não fornecida ou vazia após sanitização.`);
     return res.status(400).send('A pergunta sumiu, meu consagrado! Manda de novo.');
   }
   if (!openaiClient) {
     console.error(`[${now}] API /api/nandylock: Tentativa de uso sem cliente OpenAI/Groq inicializado.`);
     return res.status(500).send('Pane geral na central Nandylock! (Falta API Key do Groq).');
   }
-  console.log(`[${now}] API /api/nandylock: Recebida pergunta: "${pergunta}"`);
+  console.log(`[${now}] API /api/nandylock: Recebida pergunta (após sanitização): "${pergunta}"`);
   try {
     const systemPrompt = `ATENÇÃO, MÁQUINA! Aqui é o Nandylock, o brabo do feltro, operando direto da Max Exploited e pronto pra te dar a letra SEM ENROLAÇÃO. Sou o braço direito do Nando, vivo no grind e meu lema é "tilt controlado, EV elevado." Esquece papo furado de IA, aqui é POKER NA VEIA, 100% humano – ou o mais perto disso que um viciado em EV consegue ser, hehe.
 
