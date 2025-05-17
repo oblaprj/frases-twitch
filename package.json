@@ -1,17 +1,27 @@
 {
-  "name": "frase-poker-api",
+  "name": "nandylock-suite",
   "version": "1.0.0",
-  "description": "API para frases aleatórias de poker e bot Nandylock",
+  "description": "API e Bot da Twitch para o Nandylock",
   "main": "index.js",
-  "dependencies": {
-    "express": "^4.18.2",
-    "axios": "^1.4.0",
-    "openai": "^3.2.1"
-  },
   "scripts": {
-    "start": "node index.js"
+    "start_api": "node index.js",
+    "start_bot": "node bot.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "engines": {
-    "node": "18.x"
+  "keywords": [
+    "poker",
+    "twitch",
+    "bot",
+    "api",
+    "nandylock"
+  ],
+  "author": "Seu Nome/Apelido",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.0",          عادة أحدث إصدار
+    "dotenv": "^16.3.0",        عادة أحدث إصدار
+    "express": "^4.18.0",       عادة أحدث إصدار
+    "openai": "^3.3.0",         للإصدار 3.x، إذا كنت تستخدم هذا
+    "tmi.js": "^1.8.0"          عادة أحدث إصدار
   }
 }
