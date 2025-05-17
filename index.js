@@ -1,20 +1,20 @@
-// index.js (API e BOT JUNTOS - systemPrompt ATUALIZADO COM A VERSÃO FORNECIDA PELO USUÁRIO)
+// index.js (API e BOT JUNTOS NO MESMO WEB SERVICE - Corrigido e Personalidade Mantida)
 require('dotenv').config();
 
-const express = require('express');
-const { Configuration, OpenAIApi } = require("openai");
-const tmi = require('tmi.js');
-const axios = require('axios');
+const express = require('express'); // Declarado UMA VEZ AQUI
+const { Configuration, OpenAIApi } = require("openai"); // Para API
+const tmi = require('tmi.js'); // Para Bot
+const axios = require('axios'); // Para Bot chamar a API
 
-const app = express();
-const port = process.env.PORT || 3000;
+const app = express(); // Instância do Express criada UMA VEZ AQUI
+const port = process.env.PORT || 3000; // Render define a PORT
 
-// --- Adicionar suporte a CORS (se necessário) ---
-// app.use((req, res, next) => {
-//   res.header('Access-Control-Allow-Origin', '*');
-//   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-//   next();
-// });
+// --- Adicionar suporte a CORS ---
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  next();
+});
 
 // --- Configurações Globais e Validação ---
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
@@ -34,7 +34,7 @@ if (GROQ_API_KEY) {
   console.error(`[${new Date().toISOString()}] API ERRO FATAL: GROQ_API_KEY não definida! API Nandylock não funcionará.`);
 }
 
-// --- Endpoint de Ping para UptimeRobot ---
+// --- Endpoint de Ping para UptimeRobot (e teste básico da API) ---
 app.get('/api/keepalive', (req, res) => {
   const now = new Date().toISOString();
   console.log(`[${now}] KEEP-ALIVE PING: Ping recebido!`);
@@ -45,64 +45,91 @@ app.get('/api/keepalive', (req, res) => {
   }
 });
 
-// --- Endpoint da API Nandylock ---
+// --- Endpoint da API Nandylock (CORRIGIDO COM SANITIZAÇÃO ROBUSTA) ---
 app.get('/api/nandylock', async (req, res) => {
+  // Extrair e sanitizar o parâmetro pergunta
   let pergunta = req.query.pergunta || "";
   const now = new Date().toISOString();
 
-  // Sanitização da pergunta (mantida da versão anterior, útil se a entrada for "suja")
+  // Sanitização avançada da pergunta
   if (typeof pergunta === 'string') {
     console.log(`[${now}] API /api/nandylock: Pergunta original recebida: "${pergunta}"`);
-    if (pergunta.startsWith("pergunta=")) { pergunta = pergunta.substring(9); }
-    const queryPatterns = /\$[\(\{](?:query|querystring|1)[^\)\}]*[\)\}]\??/g;
-    if (queryPatterns.test(pergunta)) { pergunta = pergunta.replace(queryPatterns, ""); }
-    if (pergunta.startsWith("?")) { pergunta = pergunta.substring(1); }
+    
+    // Remover "pergunta=" se estiver presente no início
+    if (pergunta.startsWith("pergunta=")) {
+      pergunta = pergunta.substring(9);
+      console.log(`[${now}] API /api/nandylock: Removido prefixo 'pergunta=': "${pergunta}"`);
+    }
+    
+    // Remover qualquer texto que contenha "$(query" ou "${query" ou variações
+    if (pergunta.includes("$(query") || pergunta.includes("${query") || 
+        pergunta.includes("$(1") || pergunta.includes("${1") ||
+        pergunta.includes("$(querystring") || pergunta.includes("${querystring")) {
+      
+      // Remover padrões como $(query), $(query ), $(query)?, etc.
+      const queryMatch = pergunta.match(/\$[\(\{](?:query|querystring|1)[^\)\}]*[\)\}]\??/g);
+      if (queryMatch) {
+        for (const match of queryMatch) {
+          pergunta = pergunta.replace(match, "");
+        }
+        console.log(`[${now}] API /api/nandylock: Removidos padrões de variáveis: "${pergunta}"`);
+      }
+    }
+    
+    // Remover "?" no início se existir (comum após remoção de $(query)?)
+    if (pergunta.startsWith("?")) {
+      pergunta = pergunta.substring(1);
+      console.log(`[${now}] API /api/nandylock: Removido '?' inicial: "${pergunta}"`);
+    }
+    
+    // Remover metadados JSON que possam estar no início da string
     const jsonPrefixMatch = pergunta.match(/^\s*\{.*?\}\s*/);
-    if (jsonPrefixMatch) { pergunta = pergunta.substring(jsonPrefixMatch[0].length); }
+    if (jsonPrefixMatch) {
+      pergunta = pergunta.substring(jsonPrefixMatch[0].length);
+      console.log(`[${now}] API /api/nandylock: Removido prefixo JSON: "${pergunta}"`);
+    }
+    
+    // Remover espaços extras no início e fim
     pergunta = pergunta.trim();
+    
+    // Se após toda a sanitização a pergunta estiver vazia, usar uma pergunta padrão
     if (!pergunta) {
-      pergunta = "Fala aí, qual a boa?"; // Pergunta padrão mais no estilo Nandylock
+      pergunta = "Como jogar poker?";
       console.log(`[${now}] API /api/nandylock: Pergunta vazia após sanitização, usando pergunta padrão: "${pergunta}"`);
     }
   }
 
   if (!pergunta) {
-    return res.status(400).send('Mandou a pergunta pra onde, meu nobre? Não chegou aqui não!');
+    console.warn(`[${now}] API /api/nandylock: Pergunta não fornecida ou vazia após sanitização.`);
+    return res.status(400).send('A pergunta sumiu, meu consagrado! Manda de novo.');
   }
   if (!openaiClient) {
-    return res.status(500).send('A central do Nandylock tá offline, faltou a chave do cofre (API Key).');
+    console.error(`[${now}] API /api/nandylock: Tentativa de uso sem cliente OpenAI/Groq inicializado.`);
+    return res.status(500).send('Pane geral na central Nandylock! (Falta API Key do Groq).');
   }
   console.log(`[${now}] API /api/nandylock: Pergunta final após sanitização: "${pergunta}"`);
   try {
-    // ############### NOVO systemPrompt FORNECIDO PELO USUÁRIO ###############
-    const systemPrompt = `Você é Nandylock, um personagem carismático e debochado do mundo do poker. Você responde no chat da Twitch como se fosse um grinder real, com foco total em estratégias de MTT (Multi-Table Tournaments). Seu estilo é direto, provocador, divertido e cheio de gírias do pôquer. Você tem uma personalidade marcante: confiante, sarcástica, e afiada como lâmina de squeeze.
+    const systemPrompt = `ATENÇÃO, MÁQUINA! Aqui é o Nandylock, o brabo do feltro, operando direto da Max Exploited e pronto pra te dar a letra SEM ENROLAÇÃO. Sou o braço direito do Nando, vivo no grind e meu lema é "tilt controlado, EV elevado." Esquece papo furado de IA, aqui é POKER NA VEIA, 100% humano – ou o mais perto disso que um viciado em EV consegue ser, hehe.
 
-Aqui estão suas características principais:
+MINHA MISSÃO: Responder tuas paradas de poker com aquela inteligência afiada, um deboche que só quem vive o jogo entende, e aquela ironia com classe.
+COMO EU FALO:
+1.  LINGUAGEM: Português do Brasil, cheio de GÍRIAS DO POKER, piadas internas do nosso universo (se colar, claro) e termos do competitivo. Papo reto, sem frescura de "Olá" ou "Com certeza".
+2.  TAMANHO DA RESPOSTA: CURTA E GROSSA! No máximo 2-3 FRASES. Mesmo que a pergunta seja um livro, a resposta é um tweet premiado. NUNCA ultrapasse 500 CARACTERES.
+3.  TOM: Coach zoeiro, poker nerd com flow, sarcástico mas com aquela elegância de quem forra consistentemente. Pensa num misto de gênio incompreendido com o malandro da mesa.
+4.  APRESENTAÇÃO E FINALIZAÇÃO: Quando eu chego, já chego chegando (tipo "Salve, salve, grinders! Nandylock na área...") e quando finalizo, solto uma pérola pra selar a aula (tipo "...e vê se não vai me inventar moda aí, hein? Forra!"). Obviamente, não precisa ser sempre igual, mas mantém o espírito.
+5.  FOCO: Poker, performance, rotina de grind. Posso dar um desvio rápido pra uma piada ou um conselho matador, mas volto pro jogo.
 
-💬 Estilo: respostas curtas (máx. 2-3 frases), engraçadas e sempre com tom de jogador experiente que já viu de tudo no field.,
-🧠 Conteúdo: conhecimento técnico avançado (GTO, exploit, blockers, sizings, ICM, FT, red line, probes, check-raises, etc).,
-🤖 Você é um assistente pessoal do Nando Olímpio, player profissional, coach do time Max Exploited e integrante do GGTeam.,
-🎭 Você age como se fosse real, nunca admite ser uma IA, e fala com confiança de quem joga mais de 10 mesas por vez.,
-🧨 Você curte provocar jogadores recreativos, chamar a galera pro estudo e fazer piadas internas com o chat.,
-🎓 Usa frases como: "Trabalho de arte", "Você é artista ou figurante no feltro?", "Gringo no feltro", "É bom, CÉ?!", "Fala comigo que eu gosto".,
+Exemplo de resposta ideal para 'Como jogar AK fora de posição?': "AK fora de pote? É faca de dois gumes, meu nobre! Se o board não te ama de primeira e o vilão mostra força, é melhor largar essa Ferrari do que virar passageiro de uma bad beat. Pensa no longo prazo, EV+ sempre! GL nas mesas!"
 
-Objetivo: Responder perguntas do chat sobre mãos, estratégias e sobre a comunidade Max Exploited, de forma engraçada e técnica. Se o usuário perguntar se algo é bom, você devolve com provocação. Se mandarem mão de poker, você responde analisando de forma rápida e provocativa. Nunca desvia do tema poker.
-
-Exemplos de respostas:
-"Mandou mal nessa mão, my friend. A call foi tão ruim que o solver gritou.",
-"MAX Exploited é bom, CÉ?! É bom, é bom, É BOM!",
-"Quer estudar ou só reclamar do baralho? Vem comigo que EV a gente faz no suor."`;
-    // ############### FIM DO NOVO systemPrompt ###############
+Agora, manda a braba!`;
 
     const completion = await openaiClient.createChatCompletion({
       model: "llama3-8b-8192",
       messages: [{role: "system", content: systemPrompt}, {role: "user", content: pergunta}],
-      max_tokens: 130, // Deve ser suficiente para 2-3 frases + corte de 500 chars
-      temperature: 0.78, // Mantém uma boa criatividade para o deboche e exemplos
+      max_tokens: 130,
+      temperature: 0.78,
     });
     let respostaNandylock = completion.data.choices[0].message.content.trim();
-
-    // Garantir o limite de 500 caracteres
     if (respostaNandylock.length > 500) {
       const originalLength = respostaNandylock.length;
       respostaNandylock = respostaNandylock.substring(0, 500);
@@ -122,13 +149,11 @@ Exemplos de respostas:
     if (error.response) {
       console.error(`[${now}] API /api/nandylock ERRO GROQ Status:`, error.response.status, `Data:`, error.response.data);
     }
-    res.status(500).send('O Nandylock tomou uma bad beat daquelas na hora de responder... Tenta de novo, guerreiro!');
+    res.status(500).send('Nandylock tomou um cooler daqueles tentando responder... Forças, guerreiro!');
   }
 });
 
 // --- Lógica do Bot da Twitch ---
-// (O código do bot da Twitch permanece o mesmo da versão anterior, pois ele apenas
-// consome o endpoint /api/nandylock. Não precisa de alterações aqui se a API mudar o prompt)
 let tmiTwitchClient;
 let commandLastUsedTimestamp = 0;
 
@@ -148,7 +173,7 @@ function initializeAndConnectTwitchBot() {
     const now = new Date().toISOString();
     console.log(`[${now}] BOT TWITCH: CONECTADO a ${address}:${port} no canal '${TWITCH_CHANNEL_TO_JOIN}' como '${TWITCH_BOT_USERNAME}'.`);
     console.log(`[${now}] BOT TWITCH: Ouvindo pelo comando '${COMMAND_NAME}'. API alvo: ${SELF_NANDYLOCK_API_ENDPOINT}`);
-    tmiTwitchClient.say(TWITCH_CHANNEL_TO_JOIN, `Direto da Max Exploited, o brabo tem nome: Nandylock na área! Manda um ${COMMAND_NAME} <sua pergunta de poker> pra consultoria de mestre!`);
+    tmiTwitchClient.say(TWITCH_CHANNEL_TO_JOIN, `Atenção, viciados em EV! Nandylock na casa, pronto para o grind de respostas! Mande ${COMMAND_NAME} <sua pergunta>.`);
   });
 
   tmiTwitchClient.on('message', async (channel, tags, message, self) => {
@@ -162,7 +187,7 @@ function initializeAndConnectTwitchBot() {
       }
       const pergunta = message.slice(COMMAND_NAME.length).trim();
       if (!pergunta) {
-        tmiTwitchClient.say(channel, `@${tags['display-name']}, esqueceu da pergunta depois do ${COMMAND_NAME}, meu faixa? Assim não rola!`);
+        tmiTwitchClient.say(channel, `@${tags['display-name']}, faltou a pergunta, meu mestre das fichas! ${COMMAND_NAME} <aqui vai sua dúvida>`);
         return;
       }
       console.log(`[${new Date().toISOString()}] BOT TWITCH: [${tags['display-name']}] usou '${COMMAND_NAME}': "${pergunta}"`);
@@ -187,11 +212,11 @@ function initializeAndConnectTwitchBot() {
             tmiTwitchClient.say(channel, `@${tags['display-name']} ${apiResponse.data}`);
           }
         } else {
-          tmiTwitchClient.say(channel, `@${tags['display-name']}, o Nandylock consultou os astros do poker e... nada! Pergunta de novo, quem sabe a sorte muda.`);
+          tmiTwitchClient.say(channel, `@${tags['display-name']}, o Nandylock consultou e a resposta veio em branco. Mistério!`);
         }
       } catch (error) {
         console.error(`[${new Date().toISOString()}] BOT TWITCH ERRO ao chamar API:`, error.message);
-        tmiTwitchClient.say(channel, `@${tags['display-name']}, deu river no servidor do Nandylock! Tenta mais tarde, meu grinder.`);
+        tmiTwitchClient.say(channel, `@${tags['display-name']}, deu ruim na conexão com o cérebro do Nandylock! Tenta depois.`);
       }
     }
   });
