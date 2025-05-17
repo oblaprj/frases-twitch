@@ -1,44 +1,54 @@
 // index.js
-require('dotenv').config();
+require('dotenv').config(); // Carrega variáveis do .env localmente
+
 const express = require('express');
 const { Configuration, OpenAIApi } = require("openai"); // Para OpenAI SDK v3.x
 
 const app = express();
-const port = process.env.PORT || 3000; // Render vai definir a PORT
+const port = process.env.PORT || 3000; // Render/outras plataformas definem a PORTA
 
-// Endpoint para o Nandylock usando Groq
+// --- Configuração do Cliente OpenAI/Groq ---
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
+let openaiClient; // Renomeado para clareza
 
-if (!GROQ_API_KEY) {
-  console.error("ALERTA VERMELHO: GROQ_API_KEY não está definida! O Nandylock vai ficar mudo assim, meu chapa!");
-}
-
-let openai;
 if (GROQ_API_KEY) {
   const configuration = new Configuration({
     apiKey: GROQ_API_KEY,
     basePath: "https://api.groq.com/openai/v1",
   });
-  openai = new OpenAIApi(configuration);
+  openaiClient = new OpenAIApi(configuration);
+  console.log("API: Cliente OpenAI/Groq inicializado com GROQ_API_KEY.");
+} else {
+  console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+  console.error("!!! API ERRO FATAL: GROQ_API_KEY não definida nas variáveis de ambiente! !!!");
+  console.error("!!! A API Nandylock NÃO FUNCIONARÁ sem ela.                     !!!");
+  console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 }
 
-// Endpoint de Teste (bom para verificar se a API está no ar)
+// --- Endpoints da API ---
+
+// Endpoint de Teste (para verificar se a API está no ar)
 app.get('/api/test', (req, res) => {
-  console.log("Endpoint de teste /api/test da API Nandylock acessado!");
+  const now = new Date().toISOString();
+  console.log(`[${now}] API: Endpoint /api/test acessado.`);
   res.set('Content-Type', 'text/plain; charset=utf-8');
-  res.status(200).send("API do Nandylock no ar e metendo a braba! Teste OK!");
+  res.status(200).send(`API do Nandylock no ar e afiada como navalha! Teste OK às ${now}. Forra!`);
 });
 
+// Endpoint Principal do Nandylock
 app.get('/api/nandylock', async (req, res) => {
-  const pergunta = req.query.pergunta;
+  const { pergunta } = req.query;
+  const now = new Date().toISOString();
+  console.log(`[${now}] API: Recebida pergunta para /api/nandylock: "${pergunta}"`);
 
   if (!pergunta) {
-    return res.status(400).send('Ô, gênio, cadê a pergunta? Manda a letra!');
+    console.warn(`[${now}] API: Pergunta não fornecida para /api/nandylock.`);
+    return res.status(400).send('Ô, gênio da lâmpada, cadê a pergunta? Assim não tem mágica!');
   }
 
-  if (!GROQ_API_KEY || !openai) {
-    console.error('Falha crítica: GROQ_API_KEY não configurada ou OpenAI client não inicializado.');
-    return res.status(500).send('Deu tilt na Matrix! A central do Nandylock tá offline por falta de chave ou erro interno.');
+  if (!openaiClient) {
+    console.error(`[${now}] API: Tentativa de usar /api/nandylock sem cliente OpenAI/Groq inicializado (GROQ_API_KEY faltando?).`);
+    return res.status(500).send('Deu tilt na Matrix! A central de inteligência do Nandylock tá offline por falta de chave ou pane no sistema.');
   }
 
   try {
@@ -47,56 +57,50 @@ Estilo: sarcástico com classe, poker nerd com flow, mistura de coach e zoeiro.
 Não foge do tema principal (poker, performance, rotina de grind), mas pode fazer desvios rápidos se for pra soltar uma piada ou dar um conselho afiado.
 Responde em no máximo 2-3 frases, mesmo que a pergunta seja longa. com maximo 500 caracteres`;
 
-    const completion = await openai.createChatCompletion({
+    const completion = await openaiClient.createChatCompletion({
       model: "llama3-8b-8192",
       messages: [
         {role: "system", content: systemPrompt},
         {role: "user", content: pergunta}
       ],
-      max_tokens: 120,
+      max_tokens: 130, // Aumentei um pouco para dar mais margem para 2-3 frases e o corte final de 500 chars
       temperature: 0.78,
     });
 
     let respostaNandylock = completion.data.choices[0].message.content.trim();
 
+    // Garantir o limite de 500 caracteres de forma explícita
     if (respostaNandylock.length > 500) {
+      const originalLength = respostaNandylock.length;
       respostaNandylock = respostaNandylock.substring(0, 500);
       const ultimoEspaco = respostaNandylock.lastIndexOf(' ');
-      if (ultimoEspaco > 0 && (500 - ultimoEspaco < 25) && ultimoEspaco < 495) {
+      if (ultimoEspaco > 0 && (500 - ultimoEspaco < 30) && ultimoEspaco < 497) { // Ajustei as condições do corte
           respostaNandylock = respostaNandylock.substring(0, ultimoEspaco).trim() + "...";
       } else {
           respostaNandylock = respostaNandylock.trim() + "...";
       }
+      console.log(`[${now}] API: Resposta original (${originalLength} chars) cortada para ${respostaNandylock.length} chars.`);
     }
 
-    console.log(`[API NANDYLOCK RESPONSE] Pergunta: "${pergunta}", Resposta: "${respostaNandylock}"`);
+    console.log(`[${now}] API: Resposta Nandylock para "${pergunta}": "${respostaNandylock}"`);
     res.set('Content-Type', 'text/plain; charset=utf-8');
     res.send(respostaNandylock);
 
   } catch (error) {
-    console.error('--- ERRO NA API NANDYLOCK (GROQ) ---');
-    let errorDetails = 'Erro cabuloso ao tentar consultar o oráculo Nandylock.';
+    console.error(`[${now}] API ERRO CRÍTICO ao processar pergunta para /api/nandylock:`, error.message);
     if (error.response) {
-      console.error('Erro Groq Status:', error.response.status);
-      console.error('Erro Groq Data:', JSON.stringify(error.response.data, null, 2));
-      const groqErrorMessage = error.response.data?.error?.message || JSON.stringify(error.response.data);
-      errorDetails = `Erro ${error.response.status} do servidor do oráculo. Detalhe: ${groqErrorMessage}`;
-    } else {
-      console.error('Erro Groq Mensagem Geral:', error.message);
-      errorDetails = error.message;
+      console.error(`[${now}] API ERRO GROQ Status:`, error.response.status);
+      console.error(`[${now}] API ERRO GROQ Data:`, JSON.stringify(error.response.data, null, 2));
     }
-    console.error('--- FIM ERRO NANDYLOCK (GROQ) ---');
-    res.status(500).send(`Ih, o Nandylock pediu mesa! ${errorDetails.substring(0,200)}`);
+    res.status(500).send('Nandylock tomou uma bad beat cósmica tentando responder... Culpa do dealer intergaláctico! Tenta de novo!');
   }
 });
 
+// --- Iniciar o Servidor ---
 app.listen(port, () => {
-  console.log(`API Nandylock escutando na porta ${port}. Se prepara pra forra!`);
+  const now = new Date().toISOString();
+  console.log(`[${now}] API Nandylock: Servidor escutando na porta ${port}. Tudo pronto pra ação!`);
   if (!GROQ_API_KEY) {
-    console.warn("###########################################################################");
-    console.warn("### ATENÇÃO, MESTRE: GROQ_API_KEY NÃO DEFINIDA! NANDYLOCK VAI FICAR MUDO! ###");
-    console.warn("###########################################################################");
-  } else {
-    console.log("GROQ_API_KEY no jeito! Nandylock tá pronto pra ação!");
+    console.warn(`[${now}] API Nandylock: ATENÇÃO - GROQ_API_KEY não foi carregada. O endpoint /api/nandylock NÃO FUNCIONARÁ.`);
   }
 });
