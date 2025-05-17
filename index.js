@@ -9,6 +9,21 @@ const { Configuration, OpenAIApi } = require("openai"); // Para OpenAI SDK v3.x
 const app = express();
 const port = process.env.PORT || 3000;
 
+// ENDPOINT DE TESTE
+app.get('/api/test', (req, res) => {
+  console.log("Endpoint de teste /api/test acessado!");
+  const respostasTest = [
+    "Opa, tamo na área! Servidor do Nandylock funcionando e pronto pro HU!",
+    "Aqui é Max Exploited, my friend! Teste OK, pode mandar a próxima bomba!",
+    "Check, check... 1, 2... Som! Servidor online e afiado. GL pra nós!",
+    "Tudo nos conformes por aqui! Se o servidor fosse uma mão, seria AA no pré-flop. Testado e aprovado!",
+    "Recebido e entendido, câmbio! Nandylock na escuta e servidor tinindo!"
+  ];
+  const respostaAleatoria = respostasTest[Math.floor(Math.random() * respostasTest.length)];
+  res.set('Content-Type', 'text/plain; charset=utf-8');
+  res.status(200).send(respostaAleatoria);
+});
+
 // Endpoint original para frases aleatórias de poker
 app.get('/api/frase-poker', async (req, res) => {
   try {
@@ -60,6 +75,7 @@ app.get('/api/nandylock', async (req, res) => {
 
   try {
     // PERSONALIDADE NANDYLOCK ATUALIZADA E REFORÇADA
+    // ESTE É O PONTO CHAVE PARA O COMPORTAMENTO DESEJADO!
     const systemPrompt = `Atenção, malandro! Chegou o Nandylock, o brabo do feltro, direto da Max Exploited pra te dar o papo reto! Minha missão é te guiar no poker com aquela sagacidade única, um toque de deboche fino e a ironia que só quem vive o grind entende. Lema da casa: "Tilt é para os fracos, EV+ é para os fortes!". Sou teu coach zoeiro, o nerd do poker com ginga, sempre farejando a jogada mais lucrativa pra gente encher o bolso. Respondo SEMPRE em PORTUGUÊS DO BRASIL, na lata, usando gírias do nosso universo e piadas internas. Mantenha as respostas BEM CURTAS, tipo 2-3 frases no máximo, e NUNCA, JAMAIS, ultrapasse 500 caracteres. Nada de 'Olá, como vai?' ou 'Com certeza absoluta'. Se me chamar de IA, vai levar um raise na fuça, beleza? Aqui é poker na alma, 100% humano (ou quase, hehe). E pra fechar, sempre solto uma pérola criativa pra selar a aula. Manda a bomba!`;
 
     const completion = await openai.createChatCompletion({ // Para SDK v3.x
@@ -69,11 +85,9 @@ app.get('/api/nandylock', async (req, res) => {
         {role: "system", content: systemPrompt},
         {role: "user", content: pergunta}
       ],
-      max_tokens: 120, // Ajustado para dar margem ao modelo, o corte manual garante o limite.
+      max_tokens: 120, // Dá espaço para o modelo ser breve, mas o corte manual garante os 500 chars.
                        // Lembre-se: tokens != caracteres. 1 token ~ 3-4 caracteres em PT-BR.
-                       // 500 caracteres / 3.5 ~= 140 tokens. 120 é um bom valor para tentar manter curto.
-      temperature: 0.78, // Um pouco mais de tempero pra criatividade e deboche.
-      // stop: ["\n\n\n"] // Opcional: pode ajudar a evitar respostas muito longas se o modelo começar a divagar
+      temperature: 0.78, // Para mais criatividade e tom debochado.
     });
 
     let respostaNandylock = completion.data.choices[0].message.content.trim();
@@ -82,20 +96,18 @@ app.get('/api/nandylock', async (req, res) => {
     // Garantir o limite de 500 caracteres de forma explícita
     if (respostaNandylock.length > 500) {
       respostaNandylock = respostaNandylock.substring(0, 500);
-      // Para evitar cortar uma palavra no meio, podemos tentar encontrar o último espaço:
+      // Tenta cortar no último espaço para não quebrar palavras
       const ultimoEspaco = respostaNandylock.lastIndexOf(' ');
-      // Corta no último espaço se ele estiver "perto" do limite de 500 (ex: nos últimos 20 caracteres)
-      // e se não for o único espaço (evitar cortar uma palavra muito longa sozinha)
       if (ultimoEspaco > 0 && (500 - ultimoEspaco < 25) && ultimoEspaco < 495) {
           respostaNandylock = respostaNandylock.substring(0, ultimoEspaco).trim() + "...";
       } else {
-          respostaNandylock = respostaNandylock.trim() + "..."; // Adiciona "..." se cortou
+          respostaNandylock = respostaNandylock.trim() + "...";
       }
     }
 
     console.log(`[NANDYLOCK RESPONSE] Original Length: ${completion.data.choices[0].message.content.trim().length}, Final Length: ${respostaNandylock.length}, Response: ${respostaNandylock}`);
 
-    res.set('Content-Type', 'text/plain; charset=utf-8'); // Importante para caracteres especiais em PT-BR
+    res.set('Content-Type', 'text/plain; charset=utf-8');
     res.send(respostaNandylock);
 
   } catch (error) {
@@ -104,7 +116,6 @@ app.get('/api/nandylock', async (req, res) => {
     if (error.response) {
       console.error('Erro Groq Status:', error.response.status);
       console.error('Erro Groq Data:', JSON.stringify(error.response.data, null, 2));
-      // Tenta pegar a mensagem de erro específica da API do Groq se disponível
       const groqErrorMessage = error.response.data?.error?.message || JSON.stringify(error.response.data);
       errorDetails = `Erro ${error.response.status} do servidor do Nandylock. Detalhe: ${groqErrorMessage}`;
     } else if (error.request) {
@@ -121,6 +132,7 @@ app.get('/api/nandylock', async (req, res) => {
 
 app.listen(port, () => {
   console.log(`Servidor do Nandylock na escuta na porta ${port}. Vai que é tua!`);
+  console.log(`Para um teste rápido, acesse: http://localhost:${port}/api/test`);
   if (!GROQ_API_KEY) {
     console.warn("###################################################################################");
     console.warn("### ATENÇÃO, CAMPEÃO(Ã)!!! A GROQ_API_KEY NÃO FOI DEFINIDA NAS VARIÁVEIS DE AMBIENTE! ###");
