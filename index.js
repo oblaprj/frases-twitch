@@ -9,6 +9,13 @@ const axios = require('axios'); // Para Bot chamar a API
 const app = express(); // Instância do Express criada UMA VEZ AQUI
 const port = process.env.PORT || 3000; // Render define a PORT
 
+// --- Adicionar suporte a CORS ---
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  next();
+});
+
 // --- Configurações Globais e Validação ---
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const TWITCH_BOT_USERNAME = process.env.TWITCH_BOT_USERNAME;
@@ -38,27 +45,58 @@ app.get('/api/keepalive', (req, res) => {
   }
 });
 
-// --- Endpoint da API Nandylock (CORRIGIDO) ---
+// --- Endpoint da API Nandylock (CORRIGIDO COM SANITIZAÇÃO ROBUSTA) ---
 app.get('/api/nandylock', async (req, res) => {
   // Extrair e sanitizar o parâmetro pergunta
   let pergunta = req.query.pergunta || "";
   const now = new Date().toISOString();
 
-  // Sanitização da pergunta para remover prefixos indesejados
+  // Sanitização avançada da pergunta
   if (typeof pergunta === 'string') {
-    // Remover "pergunta=" se estiver presente no início da string
+    console.log(`[${now}] API /api/nandylock: Pergunta original recebida: "${pergunta}"`);
+    
+    // Remover "pergunta=" se estiver presente no início
     if (pergunta.startsWith("pergunta=")) {
-      pergunta = pergunta.substring(9); // Remove os primeiros 9 caracteres ("pergunta=")
+      pergunta = pergunta.substring(9);
+      console.log(`[${now}] API /api/nandylock: Removido prefixo 'pergunta=': "${pergunta}"`);
+    }
+    
+    // Remover qualquer texto que contenha "$(query" ou "${query" ou variações
+    if (pergunta.includes("$(query") || pergunta.includes("${query") || 
+        pergunta.includes("$(1") || pergunta.includes("${1") ||
+        pergunta.includes("$(querystring") || pergunta.includes("${querystring")) {
+      
+      // Remover padrões como $(query), $(query ), $(query)?, etc.
+      const queryMatch = pergunta.match(/\$[\(\{](?:query|querystring|1)[^\)\}]*[\)\}]\??/g);
+      if (queryMatch) {
+        for (const match of queryMatch) {
+          pergunta = pergunta.replace(match, "");
+        }
+        console.log(`[${now}] API /api/nandylock: Removidos padrões de variáveis: "${pergunta}"`);
+      }
+    }
+    
+    // Remover "?" no início se existir (comum após remoção de $(query)?)
+    if (pergunta.startsWith("?")) {
+      pergunta = pergunta.substring(1);
+      console.log(`[${now}] API /api/nandylock: Removido '?' inicial: "${pergunta}"`);
     }
     
     // Remover metadados JSON que possam estar no início da string
     const jsonPrefixMatch = pergunta.match(/^\s*\{.*?\}\s*/);
     if (jsonPrefixMatch) {
       pergunta = pergunta.substring(jsonPrefixMatch[0].length);
+      console.log(`[${now}] API /api/nandylock: Removido prefixo JSON: "${pergunta}"`);
     }
     
     // Remover espaços extras no início e fim
     pergunta = pergunta.trim();
+    
+    // Se após toda a sanitização a pergunta estiver vazia, usar uma pergunta padrão
+    if (!pergunta) {
+      pergunta = "Como jogar poker?";
+      console.log(`[${now}] API /api/nandylock: Pergunta vazia após sanitização, usando pergunta padrão: "${pergunta}"`);
+    }
   }
 
   if (!pergunta) {
@@ -69,7 +107,7 @@ app.get('/api/nandylock', async (req, res) => {
     console.error(`[${now}] API /api/nandylock: Tentativa de uso sem cliente OpenAI/Groq inicializado.`);
     return res.status(500).send('Pane geral na central Nandylock! (Falta API Key do Groq).');
   }
-  console.log(`[${now}] API /api/nandylock: Recebida pergunta (após sanitização): "${pergunta}"`);
+  console.log(`[${now}] API /api/nandylock: Pergunta final após sanitização: "${pergunta}"`);
   try {
     const systemPrompt = `ATENÇÃO, MÁQUINA! Aqui é o Nandylock, o brabo do feltro, operando direto da Max Exploited e pronto pra te dar a letra SEM ENROLAÇÃO. Sou o braço direito do Nando, vivo no grind e meu lema é "tilt controlado, EV elevado." Esquece papo furado de IA, aqui é POKER NA VEIA, 100% humano – ou o mais perto disso que um viciado em EV consegue ser, hehe.
 
