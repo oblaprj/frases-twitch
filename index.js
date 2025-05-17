@@ -8,12 +8,12 @@ const port = process.env.PORT || 3000;
 app.get('/api/frase-poker', async (req, res) => {
   try {
     // Buscar conteúdo do Pastebin
-    const response = await axios.get('https://pastebin.com/raw/8vdkLjuh' );
+    const response = await axios.get('https://pastebin.com/raw/8vdkLjuh');
     const frases = response.data.split('\n').filter(frase => frase.trim() !== '');
-    
+
     // Selecionar frase aleatória
     const fraseAleatoria = frases[Math.floor(Math.random() * frases.length)];
-    
+
     // Retornar apenas o texto, sem formatação JSON
     res.set('Content-Type', 'text/plain');
     res.send(fraseAleatoria);
@@ -26,19 +26,19 @@ app.get('/api/frase-poker', async (req, res) => {
 // Novo endpoint para o Nandylock
 app.get('/api/nandylock', async (req, res) => {
   const pergunta = req.query.pergunta;
-  
+
   if (!pergunta) {
     return res.status(400).send('Pergunta não fornecida');
   }
-  
+
   try {
     const configuration = new Configuration({
       apiKey: process.env.OPENAI_API_KEY,
     });
     const openai = new OpenAIApi(configuration);
-    
+
     const systemPrompt = `Você é Nandylock, um especialista carismático em poker que responde no chat da Twitch. Use linguagem descontraída, seja conciso (máximo 2-3 frases), foque em poker, não use introduções como 'Claro' ou 'Aqui está', vá direto ao ponto. Use ocasionalmente gírias de poker. Nunca mencione que é uma IA. Responda como se estivesse conversando ao vivo durante uma stream.`;
-    
+
     const completion = await openai.createChatCompletion({
       model: "gpt-3.5-turbo",
       messages: [
@@ -48,10 +48,26 @@ app.get('/api/nandylock', async (req, res) => {
       max_tokens: 150,
       temperature: 0.7
     });
-    
+
     res.send(completion.data.choices[0].message.content.trim());
   } catch (error) {
-    console.error('Erro ao processar pergunta:', error);
+    console.error('--- ERRO AO PROCESSAR PERGUNTA NANDYLOCK ---'); // Adicionado um separador para fácil visualização
+    if (error.response) {
+      // O pedido foi feito e o servidor respondeu com um status code
+      // que não está na faixa de 2xx
+      console.error('Erro OpenAI Data:', error.response.data);
+      console.error('Erro OpenAI Status:', error.response.status);
+      // console.error('Erro OpenAI Headers:', error.response.headers); // Pode ser muito verboso, descomentar se necessário
+    } else if (error.request) {
+      // O pedido foi feito mas nenhuma resposta foi recebida
+      console.error('Erro OpenAI Request:', error.request);
+    } else {
+      // Algo aconteceu ao configurar o pedido que acionou um Erro
+      console.error('Erro OpenAI Mensagem Geral:', error.message);
+    }
+    // console.error('Erro OpenAI Config:', error.config); // Detalhes da configuração da requisição, pode ser útil
+    console.error('--- FIM ERRO NANDYLOCK ---');
+
     res.status(500).send('Erro ao processar pergunta');
   }
 });
