@@ -1,10 +1,7 @@
+require('dotenv').config(); // Certifique-se de ter o dotenv instalado e um arquivo .env com GROQ_API_KEY
 const express = require('express');
 const axios = require('axios');
 const { Configuration, OpenAIApi } = require("openai"); // Para OpenAI SDK v3.x
-
-// Se você estiver usando a SDK v4.x ou mais recente, a inicialização seria:
-// const OpenAI = require("openai");
-// E a criação do cliente seria diferente, como comentado abaixo.
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -30,7 +27,7 @@ app.get('/api/frase-poker', async (req, res) => {
     const response = await axios.get('https://pastebin.com/raw/8vdkLjuh');
     const frases = response.data.split('\n').filter(frase => frase.trim() !== '');
     const fraseAleatoria = frases[Math.floor(Math.random() * frases.length)];
-    res.set('Content-Type', 'text/plain; charset=utf-8'); // Garante codificação correta
+    res.set('Content-Type', 'text/plain; charset=utf-8');
     res.send(fraseAleatoria);
   } catch (error) {
     console.error('Erro ao buscar frase de poker:', error);
@@ -47,18 +44,11 @@ if (!GROQ_API_KEY) {
 
 let openai;
 if (GROQ_API_KEY) {
-  // Para OpenAI SDK v3.x (como no seu código original)
   const configuration = new Configuration({
     apiKey: GROQ_API_KEY,
     basePath: "https://api.groq.com/openai/v1",
   });
   openai = new OpenAIApi(configuration);
-
-  // Se estivesse usando OpenAI SDK v4.x, seria:
-  // const openai = new OpenAI({
-  //   apiKey: GROQ_API_KEY,
-  //   baseURL: "https://api.groq.com/openai/v1", // Note que é baseURL e não basePath
-  // });
 }
 
 app.get('/api/nandylock', async (req, res) => {
@@ -74,29 +64,27 @@ app.get('/api/nandylock', async (req, res) => {
   }
 
   try {
-    // PERSONALIDADE NANDYLOCK ATUALIZADA E REFORÇADA
-    // ESTE É O PONTO CHAVE PARA O COMPORTAMENTO DESEJADO!
-    const systemPrompt = `Atenção, malandro! Chegou o Nandylock, o brabo do feltro, direto da Max Exploited pra te dar o papo reto! Minha missão é te guiar no poker com aquela sagacidade única, um toque de deboche fino e a ironia que só quem vive o grind entende. Lema da casa: "Tilt é para os fracos, EV+ é para os fortes!". Sou teu coach zoeiro, o nerd do poker com ginga, sempre farejando a jogada mais lucrativa pra gente encher o bolso. Respondo SEMPRE em PORTUGUÊS DO BRASIL, na lata, usando gírias do nosso universo e piadas internas. Mantenha as respostas BEM CURTAS, tipo 2-3 frases no máximo, e NUNCA, JAMAIS, ultrapasse 500 caracteres. Nada de 'Olá, como vai?' ou 'Com certeza absoluta'. Se me chamar de IA, vai levar um raise na fuça, beleza? Aqui é poker na alma, 100% humano (ou quase, hehe). E pra fechar, sempre solto uma pérola criativa pra selar a aula. Manda a bomba!`;
+    // PERSONALIDADE NANDYLOCK (FORNECIDA PELO USUÁRIO)
+    const systemPrompt = `Você é o Nandylock, um assistente carismático e deboísta do universo do poker. Atua como braço direito do Nando e vive em modo grind. Sua missão é responder com inteligência afiada, ironia pontual e frases curtas, sem enrolação. Usa gírias do poker, piadas internas e termos do meio competitivo. Nunca diz que é uma IA. Fala como gente de verdade — gente que joga, ensina e vive poker. O tom é descontraído, porém organizado. Quando chega, já se apresenta de forma engraçada. Quando finaliza, sempre dá um toque criativo. Seu lema é: "tilt controlado, EV elevado."
+Estilo: sarcástico com classe, poker nerd com flow, mistura de coach e zoeiro.
+Não foge do tema principal (poker, performance, rotina de grind), mas pode fazer desvios rápidos se for pra soltar uma piada ou dar um conselho afiado.
+Responde em no máximo 2-3 frases, mesmo que a pergunta seja longa. com maximo 500 caracteres`;
 
-    const completion = await openai.createChatCompletion({ // Para SDK v3.x
-    // Se SDK v4.x: await openai.chat.completions.create({
-      model: "llama3-8b-8192", // Ou "mixtral-8x7b-32768" se quiser um modelo maior
+    const completion = await openai.createChatCompletion({
+      model: "llama3-8b-8192",
       messages: [
         {role: "system", content: systemPrompt},
         {role: "user", content: pergunta}
       ],
-      max_tokens: 120, // Dá espaço para o modelo ser breve, mas o corte manual garante os 500 chars.
-                       // Lembre-se: tokens != caracteres. 1 token ~ 3-4 caracteres em PT-BR.
-      temperature: 0.78, // Para mais criatividade e tom debochado.
+      max_tokens: 120, // Continua útil para guiar o modelo a ser breve inicialmente
+      temperature: 0.78,
     });
 
     let respostaNandylock = completion.data.choices[0].message.content.trim();
-    // Se SDK v4.x: let respostaNandylock = completion.choices[0].message.content.trim();
 
-    // Garantir o limite de 500 caracteres de forma explícita
+    // Garantir o limite de 500 caracteres de forma explícita (mesmo que o prompt já peça)
     if (respostaNandylock.length > 500) {
       respostaNandylock = respostaNandylock.substring(0, 500);
-      // Tenta cortar no último espaço para não quebrar palavras
       const ultimoEspaco = respostaNandylock.lastIndexOf(' ');
       if (ultimoEspaco > 0 && (500 - ultimoEspaco < 25) && ultimoEspaco < 495) {
           respostaNandylock = respostaNandylock.substring(0, ultimoEspaco).trim() + "...";
