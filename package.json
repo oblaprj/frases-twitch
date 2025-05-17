@@ -1,14 +1,15 @@
 {
-  "name": "nandylock-suite",
+  "name": "nandylock-suite-completa",
   "version": "1.0.0",
-  "description": "API e Bot da Twitch para o Nandylock",
+  "description": "API Nandylock e Bot da Twitch com keep-alive",
   "main": "index.js",
   "scripts": {
     "start_api": "node index.js",
     "start_bot": "node bot.js",
-    "start": "node index.js"
+    "start": "echo \"Use 'npm run start_api' para a API ou 'npm run start_bot' para o Bot. Para deploy, use o comando específico da plataforma.\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "SeuNome",
+  "author": "Seu Nome Aqui",
   "license": "ISC",
   "dependencies": {
     "axios": "^1.6.8",
